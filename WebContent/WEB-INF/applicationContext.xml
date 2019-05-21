@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:jdbc="http://www.springframework.org/schema/jdbc" xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.0.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-3.0.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd">
+
+	
+	<!--========================================================== -->
+	<!--=========================自动扫描========================= -->
+	<!--========================================================== -->
+
+
+	<context:annotation-config />
+	 <context:component-scan base-package="com.orifound"/> 
+
+	<!--========================================================== -->
+	<!--========================导入属性文件======================= -->
+	<!--========================================================== -->
+	<context:property-placeholder location="/WEB-INF/jdbc.properties" />
+
+	<!--========================================================== -->
+	<!--======================配置数据源=========================== -->
+	<!--========================================================== -->
+	<bean id="comDataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="username" value="${jdbc.com.username}" />
+		<property name="password" value="${jdbc.com.password}" />
+		<property name="driverClassName" value="${jdbc.com.driver}" />
+		<property name="url" value="${jdbc.com.url}" />
+	</bean>
+
+
+	<!--========================================================== -->
+	<!--======================本地数据源配置======================= -->
+	<!--========================================================== -->
+	<bean id="rolDataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource"
+		parent="comDataSource">
+		<property name="username" value="${jdbc.rol.username}" />
+		<property name="password" value="${jdbc.rol.password}" />
+		<property name="driverClassName" value="${jdbc.rol.driver}" />
+		<property name="url" value="${jdbc.rol.url}" />
+	</bean>
+
+
+	<bean id="dataSource" class="com.orifound.configure.DynamicDataSource">
+		<property name="targetDataSources">
+			<!-- 指定lookupKey和与之对应的数据源 -->
+			<map key-type="java.lang.String">
+				<entry key="comDataSource" value-ref="comDataSource" />
+				<entry key="rolDataSource" value-ref="rolDataSource" />
+			</map>
+		</property>
+		<!-- 指定默认的数据源 -->
+		<property name="defaultTargetDataSource" ref="rolDataSource" />
+	</bean>
+
+	<!--========================================================== -->
+	<!--======================数据源拦截器========================= -->
+	<!--========================================================== -->
+	<bean id="dataSourceAspect" class="com.orifound.aspect.DataSourceAspect" />
+	<aop:config>
+		<aop:aspect ref="dataSourceAspect">
+			<!-- 拦截所有的Dao层方法 -->
+			<aop:pointcut id="dataSourcePointcut" expression="execution(* com.orifound.dao.*.*(..))" />
+			<aop:before pointcut-ref="dataSourcePointcut" method="intercept" />
+		</aop:aspect>
+	</aop:config>
+
+
+	<bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">
+		<property name="dataSource">
+			<ref local="dataSource" />
+		</property>
+	</bean>
+
+	<bean id="NBRYDao" class="com.orifound.dao.impl.NBRYDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+	<bean id="QGQHDMDao" class="com.orifound.dao.impl.QGQHDMDaoImpl">
+		<property name="jdbcTemplate" ref="jdbcTemplate" />
+	</bean>
+
+
+
+	<bean id="userInfoService" class="com.orifound.service.impl.UserInfoServiceImpl">
+		<property name="NBRYDao" ref="NBRYDao" />
+		<property name="QGQHDMDao" ref="QGQHDMDao" />
+	</bean>
+
+	<bean id="userInfoWSImpl" class="com.orifound.webservice.UserInfoWSImpl">
+		<property name="userInfoService" ref="userInfoService" />
+	</bean>
+    <!-- CXF -->
+	<import resource="/spring-cxf.xml" />
+</beans>
